@@ -2,13 +2,10 @@ import argparse
 import yaml
 import subprocess
 
-ORIGIN = f"https://github.com/econ-ark/REMARK"
-REMARK_BRANCH = f"master"
-DOCKER_IMAGE = f"econark/econ-ark-notebook"
+
 DO_FILE = f"do_MIN.py"
-PATH_TO_PARAMS = f"/home/jovyan/REMARK/REMARKs/CGMPortfolio/Code/Python/Calibration/"
-PATH_TO_FIGURES = f"/home/jovyan/REMARK/REMARKs/CGMPortfolio/Code/Python/Figures/"
-PATH_TO_SCRIPT = f"REMARK/REMARKs/CGMPortfolio"
+PATH_TO_PARAMS = "Code/Python/Calibration/"
+PATH_TO_FIGURES = "Code/Python/Figures/"
 RESULTS_DIR = f"figures"
 
 # Take the file as an argument
@@ -22,42 +19,6 @@ args = parser.parse_args()
 with open(args.config, "r") as stream:
     config_parameters = yaml.safe_load(stream)
 
-print(config_parameters)
-
-pwd = subprocess.run(["pwd"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-mount = str(pwd.stdout)[2:-3] + ":/home/jovyan/work"
-# mount the present directory and start up a container
-container_id = subprocess.run(
-    ["docker", "run", "-v", mount, "-d", DOCKER_IMAGE], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-)
-container_id = container_id.stdout.decode("utf-8")[:-1]
-# pull the master branch
-subprocess.run(
-    [
-        f'docker exec -it {container_id} bash -c "cd REMARK; git pull {ORIGIN} {REMARK_BRANCH}"'
-    ],
-    shell=True,
-)
-subprocess.run([f"docker exec -it  {container_id} bash -c 'pip uninstall -y econ-ark; pip install econ-ark==0.10.5'"], shell=True)
-# copy the params file to params_init file
-subprocess.run(
-    [
-        f"docker exec -it  {container_id} bash -c 'cp {PATH_TO_PARAMS}params.py {PATH_TO_PARAMS}params_init.py'"
-    ],
-    shell=True,
-)
-# copy the params files to current work directory
-subprocess.run(
-    [
-        f"docker exec -it  {container_id} bash -c 'cp {PATH_TO_PARAMS}params* /home/jovyan/work'"
-    ],
-    shell=True,
-)
-# create a directory to store results from the run
-subprocess.run(
-    [f"docker exec -it  {container_id} bash -c 'mkdir /home/jovyan/work/{RESULTS_DIR}'"],
-    shell=True,
-)
 
 dict_portfolio_keys = [
     "CRRA",
@@ -106,7 +67,6 @@ parameters_update = [
     "import numpy as np",
 ]
 for parameter in config_parameters:
-    print(f"Running docker instance against parameters: {parameter} ")
     for key, val in config_parameters[parameter].items():
         # check if it's in time_params
         if key in ["Age_born", "Age_retire", "Age_death"]:
@@ -158,44 +118,21 @@ for parameter in config_parameters:
     for i in parameters_update:
         print(i)
         print('\n')
-    with open("params.py", "w") as f:
+    with open(f"{PATH_TO_PARAMS}params.py", "w") as f:
         for item in parameters_update:
             f.write("%s\n" % item)
     # restart parameter update list
     parameters_update = parameters_update[0:2]
-    # copy new parameters file to the REMARK
-    subprocess.run(
-        [
-            f"docker exec -it  {container_id} bash -c 'cp /home/jovyan/work/params.py {PATH_TO_PARAMS}params.py'"
-        ],
-        shell=True,
-    )
+
     # remove previous figures from the REMARK
-    subprocess.run(
-        [f"docker exec -it {container_id} bash -c 'rm {PATH_TO_FIGURES}*'"], shell=True
-    )
+    subprocess.run( [f"rm {PATH_TO_FIGURES}*"], shell=True)
+
     # run the do_X file and get the results
-    subprocess.run(
-        [
-            f"docker exec -it  {container_id} bash -c 'cd {PATH_TO_SCRIPT}; ipython {DO_FILE}'"
-        ],
-        shell=True,
-    )
+    subprocess.run([f"ipython {DO_FILE}"], shell=True)
+
     # create a folder to store the figures for this parameter
-    subprocess.run(
-        [
-            f"docker exec -it  {container_id} bash -c 'mkdir /home/jovyan/work/{RESULTS_DIR}/figure_{parameter}'"
-        ],
-        shell=True,
-    )
+    subprocess.run([f"mkdir -p {RESULTS_DIR}/figure_{parameter}" ], shell=True,)
+
     # copy the files created in figures to results
-    subprocess.run(
-        [
-            f"docker exec -it {container_id} bash -c 'cp {PATH_TO_FIGURES}* /home/jovyan/work/{RESULTS_DIR}/figure_{parameter}/'"
-        ],
-        shell=True,
-    )
+    subprocess.run([f"cp {PATH_TO_FIGURES}* {RESULTS_DIR}/figure_{parameter}/" ], shell=True,)
 
-
-subprocess.run([f"docker stop {container_id}"], shell=True)
-subprocess.run([f"rm params.py params_init.py"], shell=True)

@@ -1,6 +1,3 @@
-#!/bin/bash
-# PortfolioChoiceBlogPost
+#!/bin/sh
 
-python -m pip install -r requirements.txt
-
-bash do_all_code.sh
+DISPLAY= MPLBACKEND=agg python run.py config.yaml
