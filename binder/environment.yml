@@ -1,0 +1,9 @@
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.7
+  - econ-ark=0.10.7
+  - PyYAML=5.4
+  - ipython
+  - pandas=1.3.*
